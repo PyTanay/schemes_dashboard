@@ -10,8 +10,8 @@ This dashboard helps track scheme processing KPIs, attachment handling time, use
 ### ✅ 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/streamlit-dashboard.git
-cd streamlit-dashboard
+git clone https://github.com/PyTanay/schemes_dashboard.git
+cd schemes_dashboard
 ```
 
 > Replace `your-username` with your GitHub username.
