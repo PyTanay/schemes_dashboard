@@ -200,7 +200,7 @@ git push origin feature-name
 
 ## 📧 Contact
 
-This tool is developed by the **TSG department**.
+This tool is developed by the **Tanay**.
 For internal queries, raise a support ticket or contact the dashboard maintainer.
 
 ---
