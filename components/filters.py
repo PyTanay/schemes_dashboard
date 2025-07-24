@@ -1,27 +1,85 @@
+# File: components/filters.py
 import streamlit as st
-from datetime import timedelta
 import pandas as pd
 
-def get_filters(schemes_df):
-    now = pd.Timestamp.now()
+def sidebar_filters(schemes_df: pd.DataFrame, workflow_df: pd.DataFrame) -> dict:
+    st.sidebar.header("Filters")
 
-    # Sidebar Controls
-    st.sidebar.header("🔍 Filters")
-    date_filter_type = st.sidebar.selectbox(
-        "Time Period",
-        ["All Time", "Past 1 Month", "Past 3 Months", "Past 6 Months", "Past 12 Months", "Past 3 Years", "Past 5 Years", "Custom"]
+    # Ensure date columns are datetime
+    if not pd.api.types.is_datetime64_any_dtype(schemes_df['creationDate']):
+        schemes_df['creationDate'] = pd.to_datetime(schemes_df['creationDate'], errors='coerce')
+
+    # Calculate min and max creation dates in data
+    min_date = schemes_df['creationDate'].min()
+    max_date = schemes_df['creationDate'].max()
+
+    # Preset options for date ranges
+    date_options = {
+        "All Time": (min_date, max_date),
+        "Past 1 Month": (max_date - pd.DateOffset(months=1), max_date),
+        "Past 3 Months": (max_date - pd.DateOffset(months=3), max_date),
+        "Past 6 Months": (max_date - pd.DateOffset(months=6), max_date),
+        "Past 12 Months": (max_date - pd.DateOffset(months=12), max_date),
+        "Past 2 Years": (max_date - pd.DateOffset(years=2), max_date),
+        "Past 3 Years": (max_date - pd.DateOffset(years=3), max_date),
+        "Past 5 Years": (max_date - pd.DateOffset(years=5), max_date),
+        "Past 10 Years": (max_date - pd.DateOffset(years=10), max_date),
+        "Custom Range": None  # Special option for custom range
+    }
+
+    # Dropdown selectbox for creation date range presets plus custom
+    selected_range = st.sidebar.selectbox(
+        "Creation Date Range",
+        options=list(date_options.keys()),
+        index=0
     )
 
-    if date_filter_type == "Custom":
-        start_date = st.sidebar.date_input("Start Date", value=now - timedelta(days=180))
-        end_date = st.sidebar.date_input("End Date", value=now)
+    if selected_range == "Custom Range":
+        # Custom range date pickers
+        date_start = st.sidebar.date_input(
+            "Start Date",
+            min_value=min_date.date(),
+            max_value=max_date.date(),
+            value=min_date.date()
+        )
+        date_end = st.sidebar.date_input(
+            "End Date",
+            min_value=min_date.date(),
+            max_value=max_date.date(),
+            value=max_date.date()
+        )
+        if date_end < date_start:
+            st.sidebar.error("Error: End Date must not be before Start Date.")
     else:
-        offset = pd.DateOffset(months=int(date_filter_type.split()[1])) if "Month" in date_filter_type else pd.DateOffset(years=int(date_filter_type.split()[1])) if "Year" in date_filter_type else None
-        start_date = now - offset if offset else schemes_df["creationDate"].min()
-        end_date = now
+        date_start, date_end = date_options[selected_range]
 
-    plants = st.sidebar.multiselect("Plant", options=sorted(schemes_df["plant"].dropna().unique()))
-    categories = st.sidebar.multiselect("Category", options=sorted(schemes_df["category"].dropna().unique()))
-    departments = st.sidebar.multiselect("Department", options=sorted(schemes_df["department_at_time"].dropna().unique()))
+    # Helper function to get sorted unique values or ['UNKNOWN'] if empty
+    def get_sorted_unique(df_col):
+        unique_vals = df_col.dropna().unique()
+        if len(unique_vals) == 0:
+            return ["UNKNOWN"]
+        return sorted(unique_vals)
 
-    return pd.to_datetime(start_date), pd.to_datetime(end_date), plants, categories, departments
+    # Multi-select filters for categorical fields with all selected by default
+    plants = get_sorted_unique(schemes_df['plant'])
+    selected_plants = st.sidebar.multiselect("Plant", plants, default=[])
+
+    categories = get_sorted_unique(schemes_df['category'])
+    selected_categories = st.sidebar.multiselect("Category", categories, default=[])
+
+    departments = get_sorted_unique(schemes_df['department_at_time'])
+    selected_departments = st.sidebar.multiselect("Department", departments, default=[])
+
+    users = get_sorted_unique(workflow_df['user'])
+    selected_users = st.sidebar.multiselect("User", users, default=[])
+
+    # Return filters as dictionary
+    filters = {
+        "date_range": (pd.to_datetime(date_start), pd.to_datetime(date_end)),
+        "plants": selected_plants,
+        "categories": selected_categories,
+        "departments": selected_departments,
+        "users": selected_users,
+    }
+
+    return filters
