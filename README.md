@@ -161,7 +161,7 @@ git remote -v
 If blank, set remote:
 
 ```bash
-git remote add origin https://github.com/your-username/streamlit-dashboard.git
+git remote add origin https://github.com/PyTanay/schemes_dashboard.git
 git push -u origin main
 ```
 
