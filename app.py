@@ -13,6 +13,8 @@ from components.charts import (
     sankey_scheme_flow,
     aging_bucket_distribution,
     performance_matrix,
+    histogram_avg_time_bins,
+
 )
 from components.data_health import display_data_health
 from components.theme_utils import  accessibility_options  # optional
@@ -21,32 +23,36 @@ from components.theme_utils import  accessibility_options  # optional
 def filter_data(schemes, workflow, attachments, filters):
     start_date, end_date = filters["date_range"]
 
-    # Filter Schemes by date range
+    # Filter schemes by main criteria
     filtered_schemes = schemes[
         (schemes['creationDate'] >= pd.to_datetime(start_date)) &
         (schemes['creationDate'] <= pd.to_datetime(end_date))
     ]
-    # Conditional filters: only apply if selection non-empty
     if filters["plants"]:
         filtered_schemes = filtered_schemes[filtered_schemes['plant'].isin(filters["plants"])]
     if filters["categories"]:
         filtered_schemes = filtered_schemes[filtered_schemes['category'].isin(filters["categories"])]
     if filters["departments"]:
         filtered_schemes = filtered_schemes[filtered_schemes['department_at_time'].isin(filters["departments"])]
-
-    # Filter Workflow table
+    
+    # Filter workflow
     filtered_workflow = workflow.copy()
     if filters["users"]:
         filtered_workflow = filtered_workflow[filtered_workflow['user'].isin(filters["users"])]
     if filters["departments"]:
         filtered_workflow = filtered_workflow[filtered_workflow['department'].isin(filters["departments"])]
-
-    # Filter Attachments table
-    filtered_attachments = attachments.copy()
+    # New: Only keep workflow steps relating to visible schemes
+    if not filtered_schemes.empty:
+        filtered_workflow = filtered_workflow[filtered_workflow['scheme_id'].isin(filtered_schemes['scheme_id'])]
+    
+    # Filter attachments table by both user and scheme_id in filtered schemes
+    filtered_attachments = attachments[attachments['scheme_id'].isin(filtered_schemes['scheme_id'])]
     if filters["users"]:
         filtered_attachments = filtered_attachments[filtered_attachments['user'].isin(filters["users"])]
-
+    
     return filtered_schemes, filtered_workflow, filtered_attachments
+
+
 
 
 def main():
@@ -84,6 +90,8 @@ def main():
         st.header("📈 Overview")
         line_avg_processing_time(filtered_workflow)
         bar_scheme_count_by_category(filtered_schemes)
+        histogram_avg_time_bins(filtered_schemes, filtered_workflow)
+
 
     with tabs[1]:
         st.header("🏆 Performance")
@@ -107,7 +115,7 @@ def main():
 
     # Footer / last updated or attribution
     st.markdown("---")
-    st.caption("Data refreshed: (place dynamic timestamp here if available)")
+    st.caption("Created by Tanay.")
 
 if __name__ == "__main__":
     main()
