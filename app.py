@@ -14,76 +14,69 @@ from components.charts import (
     aging_bucket_distribution,
     performance_matrix,
     histogram_avg_time_bins,
-
 )
 from components.data_health import display_data_health
-from components.theme_utils import  accessibility_options  # optional
+from components.theme_utils import accessibility_options  # optional
 
-# Filtering function that respects empty selections as "no filter" on those fields
+# Filtering function supporting both creationInfo and workflowPath modes
 def filter_data(schemes, workflow, attachments, filters):
     start_date, end_date = filters["date_range"]
+    filter_mode = filters["filter_mode"]
 
-    # Filter schemes by main criteria
-    filtered_schemes = schemes[
-        (schemes['creationDate'] >= pd.to_datetime(start_date)) &
-        (schemes['creationDate'] <= pd.to_datetime(end_date))
-    ]
-    if filters["plants"]:
-        filtered_schemes = filtered_schemes[filtered_schemes['plant'].isin(filters["plants"])]
-    if filters["categories"]:
-        filtered_schemes = filtered_schemes[filtered_schemes['category'].isin(filters["categories"])]
-    if filters["departments"]:
-        filtered_schemes = filtered_schemes[filtered_schemes['department_at_time'].isin(filters["departments"])]
-    
-    # Filter workflow
-    filtered_workflow = workflow.copy()
-    if filters["users"]:
-        filtered_workflow = filtered_workflow[filtered_workflow['user'].isin(filters["users"])]
-    if filters["departments"]:
-        filtered_workflow = filtered_workflow[filtered_workflow['department'].isin(filters["departments"])]
-    # New: Only keep workflow steps relating to visible schemes
-    if not filtered_schemes.empty:
-        filtered_workflow = filtered_workflow[filtered_workflow['scheme_id'].isin(filtered_schemes['scheme_id'])]
-    
-    # Filter attachments table by both user and scheme_id in filtered schemes
+    filtered_schemes = pd.DataFrame()
+    filtered_workflow = pd.DataFrame()
+
+    if filter_mode == "creationInfo":
+        filtered_schemes = schemes[
+            (schemes['creationDate'] >= pd.to_datetime(start_date)) &
+            (schemes['creationDate'] <= pd.to_datetime(end_date))
+        ]
+        if filters["categories"]:
+            filtered_schemes = filtered_schemes[filtered_schemes['category'].isin(filters["categories"])]
+        if filters["departments"]:
+            filtered_schemes = filtered_schemes[filtered_schemes['department_at_time'].isin(filters["departments"])]
+        if filters["users"]:
+            filtered_schemes = filtered_schemes[filtered_schemes['createdBy'].isin(filters["users"])]
+        filtered_workflow = workflow[workflow['scheme_id'].isin(filtered_schemes['scheme_id'])]
+
+    else:  # workflowPath
+        filtered_workflow = workflow[
+            (workflow['forwarded_at'] >= pd.to_datetime(start_date)) &
+            (workflow['forwarded_at'] <= pd.to_datetime(end_date))
+        ]
+        if filters["departments"]:
+            filtered_workflow = filtered_workflow[filtered_workflow['department'].isin(filters["departments"])]
+        if filters["users"]:
+            filtered_workflow = filtered_workflow[filtered_workflow['user'].isin(filters["users"])]
+        scheme_ids = filtered_workflow['scheme_id'].unique()
+        filtered_schemes = schemes[schemes['scheme_id'].isin(scheme_ids)]
+
     filtered_attachments = attachments[attachments['scheme_id'].isin(filtered_schemes['scheme_id'])]
-    if filters["users"]:
-        filtered_attachments = filtered_attachments[filtered_attachments['user'].isin(filters["users"])]
-    
     return filtered_schemes, filtered_workflow, filtered_attachments
 
 
-
-
 def main():
-    # Configure page
-    st.set_page_config(
-        page_title="Scheme Lifecycle Management Dashboard",
-        layout="wide",
-        initial_sidebar_state="expanded",
-    )
+    st.set_page_config(layout="wide", page_title="Workflow Dashboard", page_icon="📊")
+    # accessibility_options()
 
-    # Optionally activate theme and accessibility toggles
-    # _high_contrast, _large_text = accessibility_options()
+    st.title("📊 Workflow Dashboard")
 
-    st.title("🚀 Scheme Lifecycle Management Dashboard")
-
-    # Load cleaned datasets
+    # Load data
     schemes = load_schemes()
     workflow = load_workflow()
     attachments = load_attachments()
     data_health = load_health_metrics()
 
-    # Sidebar: get filters dictionary
+    # Sidebar filters
     filters = sidebar_filters(schemes, workflow)
 
-    # Filter data according to current filters
+    # Filter data
     filtered_schemes, filtered_workflow, filtered_attachments = filter_data(schemes, workflow, attachments, filters)
 
-    # Display KPIs
-    display_kpi_cards(filtered_schemes, filtered_workflow, filtered_attachments)
+    # KPI Cards
+    display_kpi_cards(filtered_schemes, filtered_workflow,filtered_attachments)
 
-    # Main tabs for organization
+     # Main tabs for organization
     tabs = st.tabs(["Overview", "Performance", "Scheme Flow", "Aging Analysis", "Data Health", "Detailed Data"])
 
     with tabs[0]:
@@ -116,6 +109,7 @@ def main():
     # Footer / last updated or attribution
     st.markdown("---")
     st.caption("Created by Tanay.")
+
 
 if __name__ == "__main__":
     main()
